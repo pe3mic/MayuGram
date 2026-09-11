@@ -1,0 +1,82 @@
+name: Linux amd64 (test build)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build
+    runs-on: clay-pve
+
+    strategy:
+      matrix:
+        defines:
+          - ""
+
+    env:
+      UPLOAD_ARTIFACT: "true"
+      IMAGE_TAG: tdesktop:centos_env
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Prepare for build
+        uses: docker/build-push-action@v7
+        with:
+          context: Telegram/build/docker/centos_env
+          tags: ${{ env.IMAGE_TAG }}
+          load: true
+
+      - name: Build
+        run: |
+          DEFINE=""
+          if [ -n "${{ matrix.defines }}" ]; then
+            DEFINE="-D ${{ matrix.defines }}=ON"
+            echo Define from matrix: $DEFINE
+            echo "ARTIFACT_NAME=MayuGram ${{ matrix.defines }}" >> $GITHUB_ENV
+          else
+            echo "ARTIFACT_NAME=MayuGram" >> $GITHUB_ENV
+          fi
+
+          docker run --rm \
+          -u $(id -u) \
+          -v $PWD:/usr/src/tdesktop \
+          -e CONFIG=Debug \
+          -e CCACHE_SLOPPINESS=pch_defines,time_macros \
+          $IMAGE_TAG \
+          /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
+          -D CMAKE_CONFIGURATION_TYPES=Debug \
+          -D CMAKE_C_FLAGS_DEBUG="-O0 -fpch-preprocess" \
+          -D CMAKE_CXX_FLAGS_DEBUG="-O0 -fpch-preprocess" \
+          -D TDESKTOP_API_TEST=ON \
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF \
+          $DEFINE
+
+      - name: Check if build completed successfully
+        run: |
+          filePath="out/Debug/Telegram"
+          if test -f "$filePath"; then
+            echo "Build successfully done! :)"
+
+            size=$(stat -c %s "$filePath")
+            echo "File size of ${filePath}: ${size} Bytes."
+          else
+            echo "Build error, output file does not exist."
+            exit 1
+          fi
+
+      - name: Prepare artifacts
+        run: |
+          cd out/Debug
+          mkdir artifact
+          mv {Telegram,Updater} artifact/
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: out/Debug/artifact/
+          retention-days: 7
