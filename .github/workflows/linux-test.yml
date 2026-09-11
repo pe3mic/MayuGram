@@ -69,14 +69,14 @@ jobs:
             exit 1
           fi
 
-      - name: Prepare artifacts
+      - name: Upload artifacts
         run: |
           cd out/Debug
           mkdir artifact
           mv {Telegram,Updater} artifact/
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: out/Debug/artifact/
-          retention-days: 7
+
+          fileName="${ARTIFACT_NAME}-$(date +%Y-%m-%d)-linux.zip"
+          zip -r "${fileName}" artifact/
+          sudo mv "${fileName}" /var/www/mayu
+          sudo chown caddy:caddy "/var/www/mayu/${fileName}"
+          sudo chmod 644 "/var/www/mayu/${fileName}"
