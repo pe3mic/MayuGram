@@ -24,11 +24,10 @@ jobs:
           submodules: recursive
 
       - name: Prepare for build
-        uses: docker/build-push-action@v7
-        with:
-          context: Telegram/build/docker/centos_env
-          tags: ${{ env.IMAGE_TAG }}
-          load: true
+        run: |
+          cd Telegram/build/docker/centos_env
+          poetry install
+          poetry run gen_dockerfile | DOCKER_BUILDKIT=1 docker build -t ${{ env.IMAGE_TAG }} -
 
       - name: Build
         run: |
